@@ -13,6 +13,6 @@
 #  if defined(BLUR_GL_LOADER_HEADER)
 #    include BLUR_GL_LOADER_HEADER
 #  else
-#    include "../third_party/glad/include/glad/glad.h"
+#    include <glad/glad.h>
 #  endif
 #endif
