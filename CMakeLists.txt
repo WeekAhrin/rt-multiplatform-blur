@@ -19,6 +19,18 @@ else()
     find_package(OpenGL REQUIRED)
     target_link_libraries(blur PUBLIC OpenGL::GL)
     target_compile_definitions(blur PRIVATE BLUR_PLATFORM_DESKTOP)
+    
+    # Optional Desktop Demo Executable (if GLFW & ImGui are found)
+    find_package(glfw3 QUIET)
+    if(glfw3_FOUND)
+        add_executable(blur_desktop_demo
+            demo/desktop_main.cpp
+            demo/demo_blur.cpp
+            demo/examples/imgui_examples.cpp
+            demo/examples/opengl_examples.cpp
+        )
+        target_link_libraries(blur_desktop_demo PRIVATE blur glfw OpenGL::GL)
+    endif()
 endif()
 
 target_include_directories(blur PUBLIC .)
