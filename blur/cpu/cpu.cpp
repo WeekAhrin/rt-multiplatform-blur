@@ -8,7 +8,7 @@
 
 namespace {
 
-constexpr int Channels = 4;
+constexpr int kChannels = 4;
 
 static inline uint8_t ClampU8(float v) {
     return static_cast<uint8_t>(std::clamp(v, 0.0f, 255.0f));
@@ -27,25 +27,25 @@ static void DownsampleAverage(std::span<const uint8_t> input, int width, int hei
             int srcXEnd = static_cast<int>((x + 1) * xRatio);
             if (x == smallW - 1) srcXEnd = width;
 
-            int sum[Channels] = {0, 0, 0, 0};
+            int sum[kChannels] = {0, 0, 0, 0};
             int count = 0;
             for (int sy = srcYStart; sy < srcYEnd; sy++) {
                 for (int sx = srcXStart; sx < srcXEnd; sx++) {
-                    int srcIdx = (sy * width + sx) * Channels;
-                    for (int c = 0; c < Channels; ++c) {
+                    int srcIdx = (sy * width + sx) * kChannels;
+                    for (int c = 0; c < kChannels; ++c) {
                         sum[c] += input[srcIdx + c];
                     }
                     count++;
                 }
             }
 
-            int dstIdx = (y * smallW + x) * Channels;
+            int dstIdx = (y * smallW + x) * kChannels;
             if (count > 0) {
-                for (int c = 0; c < Channels; ++c) {
+                for (int c = 0; c < kChannels; ++c) {
                     downsampled[dstIdx + c] = static_cast<uint8_t>(sum[c] / count);
                 }
             } else {
-                for (int c = 0; c < Channels; ++c) {
+                for (int c = 0; c < kChannels; ++c) {
                     downsampled[dstIdx + c] = 0;
                 }
             }
@@ -71,13 +71,13 @@ static void UpsampleBilinear(std::span<const uint8_t> small, int smallW, int sma
             float dx = srcX - x1;
             float inv_dx = 1.0f - dx;
 
-            int idx11 = (y1 * smallW + x1) * Channels;
-            int idx12 = (y2 * smallW + x1) * Channels;
-            int idx21 = (y1 * smallW + x2) * Channels;
-            int idx22 = (y2 * smallW + x2) * Channels;
+            int idx11 = (y1 * smallW + x1) * kChannels;
+            int idx12 = (y2 * smallW + x1) * kChannels;
+            int idx21 = (y1 * smallW + x2) * kChannels;
+            int idx22 = (y2 * smallW + x2) * kChannels;
 
-            int dstIdx = (y * width + x) * Channels;
-            for (int c = 0; c < Channels; c++) {
+            int dstIdx = (y * width + x) * kChannels;
+            for (int c = 0; c < kChannels; c++) {
                 float val1 = small[idx11 + c] * inv_dx + small[idx21 + c] * dx;
                 float val2 = small[idx12 + c] * inv_dx + small[idx22 + c] * dx;
                 out[dstIdx + c] = ClampU8(val1 * inv_dy + val2 * dy);
@@ -88,20 +88,20 @@ static void UpsampleBilinear(std::span<const uint8_t> small, int smallW, int sma
 
 static void ApplyBoxIntegral(std::span<const uint8_t> src, std::span<uint8_t> dst, int w, int h, int radius) {
     int sumStride = w + 1;
-    size_t sumSize = static_cast<size_t>(w + 1) * static_cast<size_t>(h + 1) * Channels;
+    size_t sumSize = static_cast<size_t>(w + 1) * static_cast<size_t>(h + 1) * kChannels;
     std::vector<uint32_t> sumBuffer(sumSize, 0u);
 
     for (int y = 1; y <= h; y++) {
-        int srcRow = (y - 1) * w * Channels;
-        int sumRow = y * sumStride * Channels;
-        int sumRowPrev = (y - 1) * sumStride * Channels;
+        int srcRow = (y - 1) * w * kChannels;
+        int sumRow = y * sumStride * kChannels;
+        int sumRowPrev = (y - 1) * sumStride * kChannels;
         for (int x = 1; x <= w; x++) {
-            int srcIdx = srcRow + (x - 1) * Channels;
-            int sumIdx = sumRow + x * Channels;
-            int sumLeft = sumRow + (x - 1) * Channels;
-            int sumUp = sumRowPrev + x * Channels;
-            int sumUpLeft = sumRowPrev + (x - 1) * Channels;
-            for (int c = 0; c < Channels; ++c) {
+            int srcIdx = srcRow + (x - 1) * kChannels;
+            int sumIdx = sumRow + x * kChannels;
+            int sumLeft = sumRow + (x - 1) * kChannels;
+            int sumUp = sumRowPrev + x * kChannels;
+            int sumUpLeft = sumRowPrev + (x - 1) * kChannels;
+            for (int c = 0; c < kChannels; ++c) {
                 sumBuffer[sumIdx + c] = src[srcIdx + c] + sumBuffer[sumLeft + c] + sumBuffer[sumUp + c] - sumBuffer[sumUpLeft + c];
             }
         }
@@ -120,14 +120,14 @@ static void ApplyBoxIntegral(std::span<const uint8_t> src, std::span<uint8_t> ds
             int x1p = x1;
             int x2p = x2 + 1;
 
-            int idxA = (y1p * sumStride + x1p) * Channels;
-            int idxB = (y1p * sumStride + x2p) * Channels;
-            int idxC = (y2p * sumStride + x1p) * Channels;
-            int idxD = (y2p * sumStride + x2p) * Channels;
+            int idxA = (y1p * sumStride + x1p) * kChannels;
+            int idxB = (y1p * sumStride + x2p) * kChannels;
+            int idxC = (y2p * sumStride + x1p) * kChannels;
+            int idxD = (y2p * sumStride + x2p) * kChannels;
 
             int area = (x2 - x1 + 1) * (y2 - y1 + 1);
-            int dstIdx = (y * w + x) * Channels;
-            for (int c = 0; c < Channels; ++c) {
+            int dstIdx = (y * w + x) * kChannels;
+            for (int c = 0; c < kChannels; ++c) {
                 dst[dstIdx + c] = static_cast<uint8_t>((sumBuffer[idxD + c] - sumBuffer[idxB + c] - sumBuffer[idxC + c] + sumBuffer[idxA + c]) / area);
             }
         }
@@ -158,17 +158,17 @@ static void ApplyGaussian(std::span<const uint8_t> src, std::span<uint8_t> tmp, 
 
     for (int y = 0; y < h; ++y) {
         for (int x = 0; x < w; ++x) {
-            float acc[Channels] = {0, 0, 0, 0};
+            float acc[kChannels] = {0, 0, 0, 0};
             for (int k = -r; k <= r; ++k) {
                 int sx = std::clamp(x + k, 0, w - 1);
-                int idx = (y * w + sx) * Channels;
+                int idx = (y * w + sx) * kChannels;
                 float kw = kernel[static_cast<size_t>(k + r)];
-                for (int c = 0; c < Channels; ++c) {
+                for (int c = 0; c < kChannels; ++c) {
                     acc[c] += src[idx + c] * kw;
                 }
             }
-            int outIdx = (y * w + x) * Channels;
-            for (int c = 0; c < Channels; ++c) {
+            int outIdx = (y * w + x) * kChannels;
+            for (int c = 0; c < kChannels; ++c) {
                 tmp[outIdx + c] = ClampU8(acc[c]);
             }
         }
@@ -176,17 +176,17 @@ static void ApplyGaussian(std::span<const uint8_t> src, std::span<uint8_t> tmp, 
 
     for (int y = 0; y < h; ++y) {
         for (int x = 0; x < w; ++x) {
-            float acc[Channels] = {0, 0, 0, 0};
+            float acc[kChannels] = {0, 0, 0, 0};
             for (int k = -r; k <= r; ++k) {
                 int sy = std::clamp(y + k, 0, h - 1);
-                int idx = (sy * w + x) * Channels;
+                int idx = (sy * w + x) * kChannels;
                 float kw = kernel[static_cast<size_t>(k + r)];
-                for (int c = 0; c < Channels; ++c) {
+                for (int c = 0; c < kChannels; ++c) {
                     acc[c] += tmp[idx + c] * kw;
                 }
             }
-            int outIdx = (y * w + x) * Channels;
-            for (int c = 0; c < Channels; ++c) {
+            int outIdx = (y * w + x) * kChannels;
+            for (int c = 0; c < kChannels; ++c) {
                 dst[outIdx + c] = ClampU8(acc[c]);
             }
         }
@@ -208,7 +208,7 @@ static void AddFrostedNoise(std::span<uint8_t> buf, int w, int h, int amount) {
         for (int x = 0; x < w; ++x) {
             uint32_t h1 = Hash32(static_cast<uint32_t>(x * 73856093u) ^ static_cast<uint32_t>(y * 19349663u));
             int jitter = static_cast<int>(h1 % static_cast<uint32_t>(2 * noise + 1)) - noise;
-            int idx = (y * w + x) * Channels;
+            int idx = (y * w + x) * kChannels;
             for (int c = 0; c < 3; ++c) {
                 int v = static_cast<int>(buf[idx + c]) + jitter;
                 buf[idx + c] = static_cast<uint8_t>(std::clamp(v, 0, 255));
@@ -230,12 +230,12 @@ static void ApplyKawaseCPU(std::span<const uint8_t> src, std::span<uint8_t> tmp,
                 int y1 = std::clamp(y - off, 0, h - 1);
                 int y2 = std::clamp(y + off, 0, h - 1);
 
-                int i1 = (y1 * w + x1) * Channels;
-                int i2 = (y1 * w + x2) * Channels;
-                int i3 = (y2 * w + x1) * Channels;
-                int i4 = (y2 * w + x2) * Channels;
-                int o = (y * w + x) * Channels;
-                for (int c = 0; c < Channels; ++c) {
+                int i1 = (y1 * w + x1) * kChannels;
+                int i2 = (y1 * w + x2) * kChannels;
+                int i3 = (y2 * w + x1) * kChannels;
+                int i4 = (y2 * w + x2) * kChannels;
+                int o = (y * w + x) * kChannels;
+                for (int c = 0; c < kChannels; ++c) {
                     int v = (tmp[i1 + c] + tmp[i2 + c] + tmp[i3 + c] + tmp[i4 + c]) / 4;
                     dst[o + c] = static_cast<uint8_t>((v * 3 + tmp[o + c]) / 4);
                 }
@@ -250,20 +250,20 @@ static void ApplyMotionCPU(std::span<const uint8_t> src, std::span<uint8_t> dst,
     int r = std::max(1, radius);
     for (int y = 0; y < h; ++y) {
         for (int x = 0; x < w; ++x) {
-            float acc[Channels] = {0, 0, 0, 0};
+            float acc[kChannels] = {0, 0, 0, 0};
             float wsum = 0.0f;
             for (int k = -r; k <= r; ++k) {
                 int sx = std::clamp(x + k, 0, w - 1);
                 int sy = std::clamp(y + k / 3, 0, h - 1);
                 float kw = 1.0f - (std::abs(static_cast<float>(k)) / static_cast<float>(r + 1));
-                int idx = (sy * w + sx) * Channels;
-                for (int c = 0; c < Channels; ++c) {
+                int idx = (sy * w + sx) * kChannels;
+                for (int c = 0; c < kChannels; ++c) {
                     acc[c] += src[idx + c] * kw;
                 }
                 wsum += kw;
             }
-            int o = (y * w + x) * Channels;
-            for (int c = 0; c < Channels; ++c) {
+            int o = (y * w + x) * kChannels;
+            for (int c = 0; c < kChannels; ++c) {
                 dst[o + c] = ClampU8((wsum > 0.0f) ? (acc[c] / wsum) : src[o + c]);
             }
         }
@@ -282,11 +282,11 @@ static void ApplyZoomCPU(std::span<const uint8_t> src, std::span<uint8_t> dst, i
             int sy1 = std::clamp(static_cast<int>(y + dy * 0.04f * strength), 0, h - 1);
             int sx2 = std::clamp(static_cast<int>(x - dx * 0.04f * strength), 0, w - 1);
             int sy2 = std::clamp(static_cast<int>(y - dy * 0.04f * strength), 0, h - 1);
-            int o = (y * w + x) * Channels;
+            int o = (y * w + x) * kChannels;
             int i0 = o;
-            int i1 = (sy1 * w + sx1) * Channels;
-            int i2 = (sy2 * w + sx2) * Channels;
-            for (int c = 0; c < Channels; ++c) {
+            int i1 = (sy1 * w + sx1) * kChannels;
+            int i2 = (sy2 * w + sx2) * kChannels;
+            for (int c = 0; c < kChannels; ++c) {
                 dst[o + c] = static_cast<uint8_t>((src[i0 + c] * 2 + src[i1 + c] + src[i2 + c]) / 4);
             }
         }
@@ -299,21 +299,21 @@ static void ApplyPixelateCPU(std::span<const uint8_t> src, std::span<uint8_t> ds
         for (int bx = 0; bx < w; bx += block) {
             int ex = std::min(w, bx + block);
             int ey = std::min(h, by + block);
-            int sum[Channels] = {0, 0, 0, 0};
+            int sum[kChannels] = {0, 0, 0, 0};
             int cnt = 0;
             for (int y = by; y < ey; ++y) {
                 for (int x = bx; x < ex; ++x) {
-                    int i = (y * w + x) * Channels;
-                    for (int c = 0; c < Channels; ++c) sum[c] += src[i + c];
+                    int i = (y * w + x) * kChannels;
+                    for (int c = 0; c < kChannels; ++c) sum[c] += src[i + c];
                     cnt++;
                 }
             }
-            uint8_t avg[Channels];
-            for (int c = 0; c < Channels; ++c) avg[c] = static_cast<uint8_t>(sum[c] / std::max(1, cnt));
+            uint8_t avg[kChannels];
+            for (int c = 0; c < kChannels; ++c) avg[c] = static_cast<uint8_t>(sum[c] / std::max(1, cnt));
             for (int y = by; y < ey; ++y) {
                 for (int x = bx; x < ex; ++x) {
-                    int i = (y * w + x) * Channels;
-                    for (int c = 0; c < Channels; ++c) dst[i + c] = avg[c];
+                    int i = (y * w + x) * kChannels;
+                    for (int c = 0; c < kChannels; ++c) dst[i + c] = avg[c];
                 }
             }
         }
@@ -322,25 +322,25 @@ static void ApplyPixelateCPU(std::span<const uint8_t> src, std::span<uint8_t> ds
 
 } // namespace
 
-void CpuApply(std::span<const uint8_t> input, std::span<uint8_t> output, int widthVal, int heightVal, float radiusVal, int downscaleVal, int typeVal) {
-    if (input.empty() || output.empty() || widthVal <= 0 || heightVal <= 0) {
+void cpuApply(std::span<const uint8_t> input, std::span<uint8_t> output, int w, int h, float radius, int downscale, int type) {
+    if (input.empty() || output.empty() || w <= 0 || h <= 0) {
         return;
     }
 
-    int intRadius = std::max(1, static_cast<int>(radiusVal));
-    int ds = std::max(1, downscaleVal);
-    int smallW = std::max(1, widthVal / ds);
-    int smallH = std::max(1, heightVal / ds);
+    int intRadius = std::max(1, static_cast<int>(radius));
+    int ds = std::max(1, downscale);
+    int smallW = std::max(1, w / ds);
+    int smallH = std::max(1, h / ds);
 
-    size_t smallSize = static_cast<size_t>(smallW) * static_cast<size_t>(smallH) * Channels;
+    size_t smallSize = static_cast<size_t>(smallW) * static_cast<size_t>(smallH) * kChannels;
     std::vector<uint8_t> downsampled(smallSize);
     std::vector<uint8_t> blurA(smallSize);
     std::vector<uint8_t> blurB(smallSize);
 
-    DownsampleAverage(input, widthVal, heightVal, smallW, smallH, downsampled);
+    DownsampleAverage(input, w, h, smallW, smallH, downsampled);
 
     int smallRadius = std::max(1, intRadius / ds);
-    switch (typeVal) {
+    switch (type) {
         case 1:
             ApplyGaussian(downsampled, blurB, blurA, smallW, smallH, smallRadius);
             break;
@@ -374,9 +374,9 @@ void CpuApply(std::span<const uint8_t> input, std::span<uint8_t> output, int wid
             break;
     }
 
-    UpsampleBilinear(blurA, smallW, smallH, output, widthVal, heightVal);
+    UpsampleBilinear(blurA, smallW, smallH, output, w, h);
 
-    for (int i = 0; i < widthVal * heightVal; ++i) {
-        output[i * Channels + 3] = 255;
+    for (int i = 0; i < w * h; ++i) {
+        output[i * kChannels + 3] = 255;
     }
 }
