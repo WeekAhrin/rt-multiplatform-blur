@@ -2,4 +2,10 @@
 
 #include "../blur.hpp"
 
-void demo_blur(Blur* blur, int screen_w, int screen_h);
+#if defined(IMGUI_VERSION) && !defined(BLUR_NO_IMGUI)
+
+namespace DemoBlur {
+    void RenderDemoWindow(Blur* blurInstance, bool* open = nullptr);
+}
+
+#endif
