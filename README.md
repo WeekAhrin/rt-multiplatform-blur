@@ -1,80 +1,46 @@
-# ImGui Android Blur
+# RT Multiplatform Blur
 
-![Android](https://img.shields.io/badge/Android-3DDC84?logo=android&logoColor=white)
-![OpenGL%20ES](https://img.shields.io/badge/OpenGL%20ES-3.0-5586A4?logo=opengl&logoColor=white)
-![AArch64](https://img.shields.io/badge/AArch64-ARM64-0091BD?logo=arm&logoColor=white)
+_Fast, lightweight, real-time blur library written in C++23 for Android and Desktop platforms._
 
-Minimal OpenGL ES 3.0 blur helper for Android. Two paths:
-- `Hardware::GPU` (fast, framebuffer ping-pong)
-- `Hardware::CPU` (readback + CPU box blur)
-- `Blur::Type`:
-  - `Default`
-  - `Gaussian`
-  - `Box`
-  - `Frosted`
-  - `Kawase`
-  - `Bokeh`
-  - `Motion`
-  - `Zoom`
-  - `Pixelate`
+```<---                    --->```
 
-## Files
-- `blur.hpp`
-- `blur.cpp`
-- `blur/math.hpp`
-- `blur/cpu/cpu.cpp`
-- `blur/gpu/gpu.cpp`
-- `blur/gpu/shaders/shaders.hpp`
-- `demo/demo_blur.cpp`
-- `demo/examples/imgui_examples.cpp`
-- `demo/examples/opengl_examples.cpp`
+_Q: What is the advantage of this blur library?_
 
-## Build Notes
-- If you use regular GLES headers/functions, do nothing.
-- If your project uses dynamic GL function loading (for example via function pointers), build with:
-  - `-DBLUR_RENDERER_NO_GLES`
-- In this mode, `blur.hpp` includes:
-  - `#include "../good_luck/glegl/glegl.h"`
-- Replace that include with your own GL loader header path if needed.
-- If you use ImGui overloads (`ImDrawList`, `ImRect`, `ImVec2` variants), make sure `imgui.h` is available in include paths.
+**A: Let's try to highlight the main ones:**
+1) **Multiplatform API.** Native support for Android (OpenGL ES 3.0) and Desktop Windows/Linux/macOS (OpenGL 3.3 Core).
+2) **Zero Heavy Dependencies.** Standalone C++23 implementation with bundled GLAD loader for desktop.
+3) **Dual Hardware Backend.** Supports `Hardware::GPU` (ping-pong FBOs) and `Hardware::CPU` (multithreading / software fallback).
+4) **Multiple Blur Algorithms.** Built-in Gaussian, Box, Frosted, Kawase, Bokeh, Motion, Zoom, and Pixelate shaders.
+5) **ImGui Integration.** Easy `ImDrawList` rounded image blur rendering for overlays.
 
-## Add To Your Project
-1. Add sources to build:
-   - `imgui-android-blur/blur.cpp`
-   - `imgui-android-blur/blur/cpu/cpu.cpp`
-   - `imgui-android-blur/blur/gpu/gpu.cpp`
-2. Add include path(s):
-   - `imgui-android-blur`
-   - your ImGui headers path (if using ImGui overloads)
-3. If you use dynamic GL loading, add compiler define:
-   - `-DBLUR_RENDERER_NO_GLES`
-4. Include and use in render loop:
+```<---                    --->```
+
+_Q: How to add to your project?_
+
+**A: Ah, it's simple:**
+1) Include `blur.hpp` in your project.
+2) Add `blur.cpp`, `blur/cpu/cpu.cpp`, and `blur/gpu/gpu.cpp` to your build targets.
+3) Initialize and use in your render loop:
 
 ```cpp
-#include "../imgui-android-blur/blur.hpp"
+#include "blur.hpp"
 
 static Blur* blur = nullptr;
 if (!blur) {
     blur = new Blur(Hardware::GPU);
+    blur->BlurType = Blur::Type::Kawase;
 }
 
-blur->process(x, y, w, h, 12.0f, 4);
-// draw blur->tex in your renderer / ImGui draw list
+blur->Process(x, y, width, height, 12.0f, 4);
+// Use blur->Texture in your OpenGL / ImGui renderer
 ```
 
-This pointer-style init avoids destructor-time GL cleanup when the library is unloaded without a valid GL context.
+```<---                    --->```
 
-## Examples
-- ImGui settings demo window: `demo/demo_blur.cpp`
-- ImGui example: `demo/examples/imgui_examples.cpp`
-- OpenGL ES example: `demo/examples/opengl_examples.cpp`
+_Q: How to use with ImGui?_
 
-## Demo Screenshot
-![demo screenshot](demo/screenshot.png)
+**A: Pass your draw list or window rect directly:**
 
-## Notes
-- Coordinates for `process(draw, ...)` are derived from the current ImGui window.
-- For ImGui, flip UVs `(0,1)` to `(1,0)` to display correctly.
-- Blur textures are written with opaque alpha; use the ImGui image tint alpha to
-  fade the blur layer.
-- `Hardware::CPU` does `glReadPixels` and is slower.
+```cpp
+blur->Process(ImGui::GetWindowDrawList(), 10.0f, 15.0f, 4, Hardware::GPU);
+```
