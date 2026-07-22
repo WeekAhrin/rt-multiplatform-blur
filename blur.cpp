@@ -5,135 +5,136 @@
 #include <span>
 #include <utility>
 
-void CpuApply(std::span<const uint8_t> input,
-              std::span<uint8_t>       output,
-              int widthVal, int heightVal,
-              float radiusVal, int downscaleVal, int typeVal);
+void cpuApply(std::span<const uint8_t> input,
+              std::span<uint8_t> output,
+              int w, int h, float radius, int downscale, int type);
 
-Blur::Blur(Hardware backendIn) noexcept : Backend(backendIn) {}
+Blur::Blur(Hardware backend_in) : backend(backend_in) {}
+Blur::~Blur() { release(); }
 
-Blur::~Blur() {
-    Release();
+void Blur::process(int x, int y, int w, int h, float radius, int downscale) {
+    x_ = x;
+    y_ = y;
+    w_ = w;
+    h_ = h;
+    radius_ = radius;
+    downscale_ = downscale;
+    apply();
 }
 
-void Blur::Process(int posX, int posY, int widthVal, int heightVal, float radiusVal, int downscaleVal) {
-    x         = posX;
-    y         = posY;
-    w         = widthVal;
-    h         = heightVal;
-    radius    = radiusVal;
-    downscale = downscaleVal;
-    Apply();
-}
-
-void Blur::Process(const Rect& rectVal) {
-    Process(rectVal.X, rectVal.Y, rectVal.W, rectVal.H, rectVal.Radius, rectVal.Downscale);
+void Blur::process(const Rect& r) {
+    process(r.x, r.y, r.w, r.h, r.radius, r.downscale);
 }
 
 #if defined(IMGUI_VERSION) && !defined(BLUR_NO_IMGUI)
-void Blur::Process(ImDrawList* draw, float cornerRadius,
-                   float radiusVal, int downscaleVal, Hardware hw) {
-    if (!draw) return;
-    Backend     = hw;
-    ImVec2 pos  = ImGui::GetWindowPos();
+void Blur::process(ImDrawList* draw, float corner_radius, float radius, int downscale, Hardware hw) {
+    if (!draw) {
+        return;
+    }
+    backend = hw;
+    ImVec2 pos = ImGui::GetWindowPos();
     ImVec2 size = ImGui::GetWindowSize();
-    Process(static_cast<int>(pos.x),  static_cast<int>(pos.y),
+    process(static_cast<int>(pos.x), static_cast<int>(pos.y),
             static_cast<int>(size.x), static_cast<int>(size.y),
-            radiusVal, downscaleVal);
+            radius, downscale);
     draw->AddImageRounded(
-        reinterpret_cast<ImTextureID>(static_cast<intptr_t>(Texture)),
+        reinterpret_cast<ImTextureID>(static_cast<intptr_t>(tex)),
         pos,
         ImVec2(pos.x + size.x, pos.y + size.y),
-        ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f),
+        ImVec2(0.0f, 1.0f),
+        ImVec2(1.0f, 0.0f),
         IM_COL32(255, 255, 255, 255),
-        cornerRadius,
+        corner_radius,
         ImDrawFlags_RoundCornersAll
     );
 }
 
-void Blur::Process(const ImRect& rectVal, float radiusVal, int downscaleVal) {
-    Process(static_cast<int>(rectVal.Min.x), static_cast<int>(rectVal.Min.y),
-            static_cast<int>(rectVal.Max.x - rectVal.Min.x),
-            static_cast<int>(rectVal.Max.y - rectVal.Min.y),
-            radiusVal, downscaleVal);
+void Blur::process(const ImRect& rect, float radius, int downscale) {
+    process(static_cast<int>(rect.Min.x), static_cast<int>(rect.Min.y),
+            static_cast<int>(rect.Max.x - rect.Min.x),
+            static_cast<int>(rect.Max.y - rect.Min.y),
+            radius, downscale);
 }
 
-void Blur::Process(const ImVec2& posVal, const ImVec2& sizeVal, float radiusVal, int downscaleVal) {
-    Process(static_cast<int>(posVal.x),  static_cast<int>(posVal.y),
-            static_cast<int>(sizeVal.x), static_cast<int>(sizeVal.y),
-            radiusVal, downscaleVal);
+void Blur::process(const ImVec2& pos, const ImVec2& size, float radius, int downscale) {
+    process(static_cast<int>(pos.x), static_cast<int>(pos.y),
+            static_cast<int>(size.x), static_cast<int>(size.y),
+            radius, downscale);
 }
 #endif
 
-void Blur::Release() {
-    GpuRelease(*this);
-    if (Texture) { glDeleteTextures(1, &Texture); Texture = 0; }
-    tex = 0;
-    cpuInput.reset();
-    cpuOutput.reset();
-    cpuSize  = 0;
-    cpuReady = false;
-}
-
-void Blur::Reset() {
-    Release();
-    x = y = w = h = 0;
-    width = height = blurW = blurH = 0;
-}
-
-void Blur::Ensure() {
-    if (Backend == Hardware::GPU) {
-        GpuEnsure(*this);
+void Blur::release() {
+    gpuRelease(*this);
+    if (tex) {
+        glDeleteTextures(1, &tex);
+        tex = 0;
     }
-    if (Backend == Hardware::CPU || !cpuReady) {
-        if (Texture == 0) glGenTextures(1, &Texture);
-        tex = Texture;
-        glBindTexture(GL_TEXTURE_2D, Texture);
+    cpu_input_.reset();
+    cpu_output_.reset();
+    cpu_size_ = 0;
+    cpu_ready_ = false;
+}
+
+void Blur::reset() {
+    release();
+    x_ = 0;
+    y_ = 0;
+    w_ = 0;
+    h_ = 0;
+    width_ = 0;
+    height_ = 0;
+    blur_w_ = 0;
+    blur_h_ = 0;
+}
+
+void Blur::ensure() {
+    if (backend == Hardware::GPU) {
+        gpuEnsure(*this);
+    }
+    if (backend == Hardware::CPU || !cpu_ready_) {
+        if (tex == 0) {
+            glGenTextures(1, &tex);
+        }
+        glBindTexture(GL_TEXTURE_2D, tex);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        if (width > 0 && height > 0) {
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
-                         width, height, 0,
-                         GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        if (width_ > 0 && height_ > 0) {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width_, height_, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
         }
-        cpuReady = true;
+        cpu_ready_ = true;
     }
 }
 
-void Blur::Apply() {
-    if (w <= 0 || h <= 0) [[unlikely]] return;
-
-    if (width != w || height != h) {
-        width  = w;
-        height = h;
+void Blur::apply() {
+    if (w_ <= 0 || h_ <= 0) [[unlikely]] {
+        return;
     }
-    Ensure();
+    if (width_ != w_ || height_ != h_) {
+        width_ = w_;
+        height_ = h_;
+    }
+    ensure();
 
-    if (Backend == Hardware::CPU) {
-        const std::size_t required =
-            static_cast<std::size_t>(w) *
-            static_cast<std::size_t>(h) * 4u;
-
-        if (cpuSize != required) {
-            cpuInput  = std::make_unique<uint8_t[]>(required);
-            cpuOutput = std::make_unique<uint8_t[]>(required);
-            cpuSize   = required;
+    if (backend == Hardware::CPU) {
+        size_t required = static_cast<size_t>(w_) * static_cast<size_t>(h_) * 4u;
+        if (cpu_size_ != required) {
+            cpu_input_ = std::make_unique<uint8_t[]>(required);
+            cpu_output_ = std::make_unique<uint8_t[]>(required);
+            cpu_size_ = required;
         }
-
-        glReadPixels(x, y, w, h, GL_RGBA, GL_UNSIGNED_BYTE, cpuInput.get());
-        CpuApply(
-            std::span<const uint8_t>(cpuInput.get(),  cpuSize),
-            std::span<uint8_t>      (cpuOutput.get(), cpuSize),
-            w, h, radius, downscale,
-            static_cast<int>(std::to_underlying(BlurType))
+        glReadPixels(x_, y_, w_, h_, GL_RGBA, GL_UNSIGNED_BYTE, cpu_input_.get());
+        cpuApply(
+            std::span<const uint8_t>(cpu_input_.get(), cpu_size_),
+            std::span<uint8_t>(cpu_output_.get(), cpu_size_),
+            w_, h_, radius_, downscale_,
+            static_cast<int>(std::to_underlying(type))
         );
-        glBindTexture(GL_TEXTURE_2D, Texture);
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h,
-                        GL_RGBA, GL_UNSIGNED_BYTE, cpuOutput.get());
+        glBindTexture(GL_TEXTURE_2D, tex);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w_, h_, GL_RGBA, GL_UNSIGNED_BYTE, cpu_output_.get());
         return;
     }
 
-    GpuApply(*this);
+    gpuApply(*this);
 }
