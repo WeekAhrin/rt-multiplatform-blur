@@ -2,6 +2,8 @@
 
 _High-performance post-processing blur and visual effects base for Android (OpenGL ES 3.0) and Desktop (OpenGL 3.3 Core) with seamless ImGui integration._
 
+![Demo Preview](demo/demo_preview.gif)
+
 ```<---                    --->```
 
 _Q: What is the advantage of this base?_
